@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Multiplayer Paint</title>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600"></canvas>
+
+<div>
+  <button id="add-image">Добавить картинку</button>
+  <input type="file" id="image-input" style="display: none" />
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const socket = io();
+
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  canvas.addEventListener('mousedown', (event) => {
+    isDrawing = true;
+    lastX = event.clientX;
+    lastY = event.clientY;
+  });
+
+  canvas.addEventListener('mousemove', (event) => {
+    if (isDrawing) {
+      const data = {
+        x1: lastX,
+        y1: lastY,
+        x2: event.clientX,
+        y2: event.clientY,
+        color: 'black',
+      };
+      socket.emit('draw', data);
+
+      // Отображаем линию на экране
+      ctx.beginPath();
+      ctx.strokeStyle = data.color;
+      ctx.moveTo(data.x1, data.y1);
+      ctx.lineTo(data.x2, data.y2);
+      ctx.stroke();
+
+      lastX = event.clientX;
+      lastY = event.clientY;
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    isDrawing = false;
+  });
+
+  canvas.addEventListener('mouseout', () => {
+    isDrawing = false;
+  });
+
+  const imageInput = document.getElementById('image-input');
+  const addImageButton = document.getElementById('add-image');
+
+  addImageButton.addEventListener('click', () => {
+    imageInput.click();
+  });
+
+  imageInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const image = new Image();
+      image.src = reader.result;
+
+      image.onload = () => {
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const data = canvas.toDataURL('image/png');
+        socket.emit('add-image', data);
+      };
+    };
+
+    reader.readAsDataURL(file);
+  });
+
+  socket.on('draw', (data) => {
+    // Отображаем линию на экране
+    ctx.beginPath();
+    ctx.strokeStyle = data.color;
+    ctx.moveTo(data.x1, data.y1);
+    ctx.lineTo(data.x2, data.y2);
+    ctx.stroke();
+  });
+
+  socket.on('add-image', (data) => {
+    const image = new Image();
+    image.src = data;
+    image.onload = () => {
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    };
+  });
+</script>
+</body>
+</html>
